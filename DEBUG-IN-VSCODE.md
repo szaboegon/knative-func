@@ -18,7 +18,7 @@
       "request": "launch",
       "mode": "exec",
       "program": "${workspaceRoot}/func.exe",
-      "args": ["create", "-l", "go", "../../temp/test-gofunc"]
+      "args": ["create", "-l", "go", "./temp/test-gofunc"]
     },
     {
       "name": "Deploy",
@@ -26,7 +26,7 @@
       "request": "launch",
       "mode": "exec",
       "program": "${workspaceRoot}/func.exe",
-      "args": ["deploy", "-p", "../../temp/test-gofunc"]
+      "args": ["deploy", "-p", "./temp/test-gofunc"]
     }
   ]
 }
