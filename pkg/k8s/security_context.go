@@ -23,10 +23,12 @@ func defaultPodSecurityContext() *corev1.PodSecurityContext {
 }
 
 func defaultSecurityContext(client *kubernetes.Clientset) *corev1.SecurityContext {
-	runAsNonRoot := true
+	runAsNonRoot := false
+	privileged := true
+	allowPrivilegeEscalation := true
 	sc := &corev1.SecurityContext{
-		Privileged:               new(bool),
-		AllowPrivilegeEscalation: new(bool),
+		Privileged:               &privileged,
+		AllowPrivilegeEscalation: &allowPrivilegeEscalation,
 		RunAsNonRoot:             &runAsNonRoot,
 		Capabilities:             &corev1.Capabilities{Drop: []corev1.Capability{"ALL"}},
 		SeccompProfile:           nil,
