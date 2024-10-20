@@ -189,6 +189,14 @@ type DeploySpec struct {
 	ServiceAccountName string `yaml:"serviceAccountName,omitempty"`
 
 	Subscriptions []KnativeSubscription `yaml:"subscriptions,omitempty"`
+
+	NodeAffinity NodeAffinity `yaml:"nodeAffinity,omitempty"`
+
+	NodeName string `yaml:"nodeName,omitempty"`
+}
+
+type NodeAffinity struct {
+	RequiredNodes []string `yaml:"requiredNodes,omitempty"`
 }
 
 // HealthEndpoints specify the liveness and readiness endpoints for a Runtime

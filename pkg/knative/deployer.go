@@ -470,8 +470,26 @@ func generateNewService(f fn.Function, decorator DeployDecorator) (*v1.Service, 
 							Containers: []corev1.Container{
 								container,
 							},
+							NodeName:           f.Deploy.NodeName,
 							ServiceAccountName: f.Deploy.ServiceAccountName,
 							Volumes:            newVolumes,
+							// Affinity: &corev1.Affinity{
+							// 	NodeAffinity: &corev1.NodeAffinity{
+							// 		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+							// 			NodeSelectorTerms: []corev1.NodeSelectorTerm{
+							// 				{
+							// 					MatchExpressions: []corev1.NodeSelectorRequirement{
+							// 						{
+							// 							Key:      "name",
+							// 							Operator: corev1.NodeSelectorOpIn,
+							// 							Values:   f.Deploy.NodeAffinity.RequiredNodes,
+							// 						},
+							// 					},
+							// 				},
+							// 			},
+							// 		},
+							// 	},
+							// },
 						},
 					},
 				},
@@ -674,7 +692,20 @@ func processEnvs(envs []fn.Env, referencedSecrets, referencedConfigMaps *sets.Se
 		return nil, nil, fmt.Errorf("unsupported env source entry \"%v\"", env)
 	}
 
+	addNodeIpEnv(&envVars)
 	return envVars, envFrom, nil
+}
+
+func addNodeIpEnv(envs *[]corev1.EnvVar) {
+	nodeIpEnv := corev1.EnvVar{
+		Name: "NODE_IP",
+		ValueFrom: &corev1.EnvVarSource{
+			FieldRef: &corev1.ObjectFieldSelector{
+				FieldPath: "status.hostIP",
+			},
+		},
+	}
+	*envs = append(*envs, nodeIpEnv)
 }
 
 // withOpenAddresss prepends ADDRESS=0.0.0.0 to the envs if not present.
