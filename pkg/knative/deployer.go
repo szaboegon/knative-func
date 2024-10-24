@@ -470,26 +470,26 @@ func generateNewService(f fn.Function, decorator DeployDecorator) (*v1.Service, 
 							Containers: []corev1.Container{
 								container,
 							},
-							NodeName:           f.Deploy.NodeName,
+							//NodeName:           f.Deploy.NodeName,
 							ServiceAccountName: f.Deploy.ServiceAccountName,
 							Volumes:            newVolumes,
-							// Affinity: &corev1.Affinity{
-							// 	NodeAffinity: &corev1.NodeAffinity{
-							// 		RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
-							// 			NodeSelectorTerms: []corev1.NodeSelectorTerm{
-							// 				{
-							// 					MatchExpressions: []corev1.NodeSelectorRequirement{
-							// 						{
-							// 							Key:      "name",
-							// 							Operator: corev1.NodeSelectorOpIn,
-							// 							Values:   f.Deploy.NodeAffinity.RequiredNodes,
-							// 						},
-							// 					},
-							// 				},
-							// 			},
-							// 		},
-							// 	},
-							// },
+							Affinity: &corev1.Affinity{
+								NodeAffinity: &corev1.NodeAffinity{
+									RequiredDuringSchedulingIgnoredDuringExecution: &corev1.NodeSelector{
+										NodeSelectorTerms: []corev1.NodeSelectorTerm{
+											{
+												MatchExpressions: []corev1.NodeSelectorRequirement{
+													{
+														Key:      "kubernetes.io/hostname",
+														Operator: corev1.NodeSelectorOpIn,
+														Values:   f.Deploy.NodeAffinity.RequiredNodes,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
 						},
 					},
 				},
@@ -629,6 +629,20 @@ func updateService(f fn.Function, previousService *v1.Service, newEnv []corev1.E
 		cp.VolumeMounts = newVolumeMounts
 		service.Spec.ConfigurationSpec.Template.Spec.Volumes = newVolumes
 		service.Spec.ConfigurationSpec.Template.Spec.PodSpec.ServiceAccountName = f.Deploy.ServiceAccountName
+
+		nodeSelectorTerms := []corev1.NodeSelectorTerm{
+			{
+				MatchExpressions: []corev1.NodeSelectorRequirement{
+					{
+						Key:      "kubernetes.io/hostname",
+						Operator: corev1.NodeSelectorOpIn,
+						Values:   f.Deploy.NodeAffinity.RequiredNodes,
+					},
+				},
+			},
+		}
+		service.Spec.ConfigurationSpec.Template.Spec.PodSpec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms = nodeSelectorTerms
+
 		return service, nil
 	}
 }
