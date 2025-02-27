@@ -10,7 +10,10 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"syscall"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/openshift/source-to-image/pkg/cmd/cli"
 	"k8s.io/klog/v2"
@@ -20,6 +23,7 @@ import (
 	"knative.dev/func/pkg/k8s"
 	"knative.dev/func/pkg/knative"
 	"knative.dev/func/pkg/scaffolding"
+	"knative.dev/func/pkg/tar"
 )
 
 func main() {
@@ -44,6 +48,12 @@ func main() {
 		cmd = scaffold
 	case "s2i":
 		cmd = s2iCmd
+	case "socat":
+		cmd = socat
+	case "sh":
+		cmd = sh
+	case "s2i-generate":
+		cmd = s2iGenerate
 	}
 
 	err := cmd(ctx)
@@ -54,7 +64,13 @@ func main() {
 }
 
 func unknown(_ context.Context) error {
-	return fmt.Errorf("unknown command: " + os.Args[0])
+	return fmt.Errorf("unknown command: %q", os.Args[0])
+}
+
+func socat(ctx context.Context) error {
+	cmd := newSocatCmd()
+	cmd.SetContext(ctx)
+	return cmd.Execute()
 }
 
 func scaffold(ctx context.Context) error {
@@ -158,4 +174,19 @@ func (d deployDecorator) UpdateLabels(function fn.Function, labels map[string]st
 		return d.oshDec.UpdateLabels(function, labels)
 	}
 	return labels
+}
+
+func sh(ctx context.Context) error {
+	if !slices.Equal(os.Args[1:], []string{"-c", "umask 0000 && exec tar -xmf -"}) {
+		return fmt.Errorf("this is a fake sh (only for backward compatiblility purposes)")
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("cannot get working directory: %w", err)
+	}
+
+	unix.Umask(0)
+
+	return tar.Extract(os.Stdin, wd)
 }

@@ -24,7 +24,7 @@ jobs:
           echo "$(brew --prefix)/opt/gnu-sed/libexec/gnubin" >> $GITHUB_PATH
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       - uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java }}
@@ -35,7 +35,14 @@ jobs:
         env:
           FUNC_REPO_REF: ${{ github.event.pull_request.head.repo.full_name }}
           FUNC_REPO_BRANCH_REF: ${{ github.head_ref }}
+      - name: Template Unit Tests on Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          python3 -m venv ${{ github.workspace }}/.venv
+          . ${{ github.workspace }}/.venv/bin/activate
+          make test-templates
       - name: Template Unit Tests
+        if: matrix.os != 'ubuntu-latest'
         run: make test-templates
       - name: "Archive code coverage results"
         uses: actions/upload-artifact@v4
@@ -54,7 +61,7 @@ jobs:
           gh run download -R ${{ github.repository }} ${{ github.run_id }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           files: ./coverage-ubuntu-latest/coverage.txt,./coverage-windows-latest/coverage.txt,./coverage-macos-latest/coverage.txt
           flags: unit-tests

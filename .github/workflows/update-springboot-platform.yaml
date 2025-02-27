@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
-      - uses: actions/setup-node@v3
+      - uses: knative/actions/setup-go@main
+      - uses: actions/setup-node@v4
         with:
           node-version: 18
       - uses: actions/setup-java@v4

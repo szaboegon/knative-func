@@ -1,28 +1,13 @@
-FROM --platform=$BUILDPLATFORM index.docker.io/library/golang:1.22.1-alpine3.19 AS builder
+FROM scratch
 
-ARG BUILDPLATFORM
-ARG TARGETPLATFORM
 ARG TARGETARCH
+ARG FUNC_UTIL_BINARY=func-util-$TARGETARCH
 
-WORKDIR /workspace
+ENV PATH=/
 
-COPY go.mod go.sum ./
-RUN go mod download -x
+COPY $FUNC_UTIL_BINARY /func-util
 
-COPY . .
-
-RUN GOARCH=$TARGETARCH go build -o func-util -trimpath -ldflags '-w -s' ./cmd/func-util
-
-#########################
-
-FROM --platform=$TARGETPLATFORM index.docker.io/library/alpine:latest
-
-RUN apk add --no-cache socat tar
-
-COPY --from=builder /workspace/func-util /usr/local/bin/
-RUN ln -s /usr/local/bin/func-util /usr/local/bin/deploy && \
-    ln -s /usr/local/bin/func-util /usr/local/bin/scaffold && \
-    ln -s /usr/local/bin/func-util /usr/local/bin/s2i
+ADD func-util-symlinks.tgz /
 
 LABEL \
    org.opencontainers.image.description="Knative Func Utils Image" \

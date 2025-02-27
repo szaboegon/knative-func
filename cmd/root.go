@@ -64,6 +64,11 @@ Learn more about Knative at: https://knative.dev`, cfg.Name),
 	viper.SetEnvPrefix("func") // ensure that all have the prefix
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
+	// check if permissions for FUNC HOME are sufficient; warn if otherwise
+	cp := config.File()
+	if _, err := os.ReadFile(cp); os.IsPermission(err) {
+		fmt.Fprintf(os.Stderr, "Warning: Insufficient permissions to read config file at '%s' - continuing without it\n", cp)
+	}
 	// Client
 	// Use the provided ClientFactory or default to NewClient
 	newClient := cfg.NewClient
@@ -298,7 +303,7 @@ func mergeEnvs(envs []fn.Env, envToUpdate *util.OrderedMap, envToRemove []string
 
 	errMsg := fn.ValidateEnvs(envs)
 	if len(errMsg) > 0 {
-		return []fn.Env{}, 0, fmt.Errorf(strings.Join(errMsg, "\n"))
+		return []fn.Env{}, 0, fmt.Errorf("error(s) while validating envs: %s", strings.Join(errMsg, "\n"))
 	}
 
 	return envs, counter, nil

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/ory/viper"
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -34,7 +35,7 @@ SYNOPSIS
 	             [-b|--build] [--builder] [--builder-image] [-p|--push]
 	             [--domain] [--platform] [--build-timestamp] [--pvc-size]
 	             [--service-account] [-c|--confirm] [-v|--verbose]
-	             [--registry-insecure]
+	             [--registry-insecure] [--remote-storage-class]
 
 DESCRIPTION
 
@@ -126,7 +127,7 @@ EXAMPLES
 
 `,
 		SuggestFor: []string{"delpoy", "deplyo"},
-		PreRunE:    bindEnv("build", "build-timestamp", "builder", "builder-image", "confirm", "domain", "env", "git-branch", "git-dir", "git-url", "image", "namespace", "path", "platform", "push", "pvc-size", "service-account", "registry", "registry-insecure", "remote", "username", "password", "token", "verbose"),
+		PreRunE:    bindEnv("build", "build-timestamp", "builder", "builder-image", "confirm", "domain", "env", "git-branch", "git-dir", "git-url", "image", "namespace", "path", "platform", "push", "pvc-size", "service-account", "registry", "registry-insecure", "remote", "username", "password", "token", "verbose", "remote-storage-class"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDeploy(cmd, newClient)
 		},
@@ -178,6 +179,8 @@ EXAMPLES
 		"Directory in the Git repository containing the function (default is the root) ($FUNC_GIT_DIR)")
 	cmd.Flags().BoolP("remote", "R", f.Local.Remote,
 		"Trigger a remote deployment. Default is to deploy and build from the local system ($FUNC_REMOTE)")
+	cmd.Flags().StringP("remote-storage-class", "", f.Build.RemoteStorageClass,
+		"Specify a storage class to use for the volume on-cluster during remote builds")
 	cmd.Flags().String("pvc-size", f.Build.PVCSize,
 		"When triggering a remote deployment, set a custom volume size to allocate for the build operation ($FUNC_PVC_SIZE)")
 	cmd.Flags().String("service-account", f.Deploy.ServiceAccountName,
@@ -516,6 +519,10 @@ type deployConfig struct {
 	// be triggered in a remote environment rather than run locally.
 	Remote bool
 
+	// RemoteStorageClass defines the storage class to use for the remote
+	// volume when building on-cluster.
+	RemoteStorageClass string
+
 	// PVCSize configures the PVC size used by the pipeline if --remote flag is set.
 	PVCSize string
 
@@ -537,6 +544,7 @@ func newDeployConfig(cmd *cobra.Command) deployConfig {
 		GitURL:             viper.GetString("git-url"),
 		Namespace:          viper.GetString("namespace"),
 		Remote:             viper.GetBool("remote"),
+		RemoteStorageClass: viper.GetString("remote-storage-class"),
 		PVCSize:            viper.GetString("pvc-size"),
 		Timestamp:          viper.GetBool("build-timestamp"),
 		ServiceAccountName: viper.GetString("service-account"),
@@ -572,6 +580,7 @@ func (c deployConfig) Configure(f fn.Function) (fn.Function, error) {
 	f.Build.Git.URL = c.GitURL
 	f.Build.Git.ContextDir = c.GitDir
 	f.Build.Git.Revision = c.GitBranch // TODO: should match; perhaps "refSpec"
+	f.Build.RemoteStorageClass = c.RemoteStorageClass
 	f.Deploy.ServiceAccountName = c.ServiceAccountName
 	f.Local.Remote = c.Remote
 
@@ -785,51 +794,13 @@ func printDeployMessages(out io.Writer, f fn.Function) {
 	}
 }
 
-// isDigested returns true if provided image string 'v' has digest and false if not.
-// Includes basic validation that a provided digest is correctly formatted.
-// Given that image is not digested, image will still be validated and return
-// a combination of bool (img has valid digest) and err (img is in valid format)
-// Therefore returned combination of [false,nil] means "valid undigested image".
+// isDigested checks that the given image reference has a digest. Invalid
+// reference return error.
 func isDigested(v string) (validDigest bool, err error) {
-	var digest string
-	vv := strings.Split(v, "@")
-	if len(vv) < 2 {
-		// image does NOT have a digest, validate further
-		if v == "" {
-			err = fmt.Errorf("provided image is empty, cannot validate")
-			return
-		}
-		vvv := strings.Split(v, ":")
-		if len(vvv) < 2 {
-			// assume user knows what hes doing
-			return
-		} else if len(vvv) > 2 {
-			err = fmt.Errorf("image '%v' contains an invalid tag (extra ':')", v)
-			return
-		}
-		tag := vvv[1]
-		if tag == "" {
-			err = fmt.Errorf("image '%v' has an empty tag", v)
-			return
-		}
-		return
-	} else if len(vv) > 2 {
-		// image is invalid
-		err = fmt.Errorf("image '%v' contains an invalid digest (extra '@')", v)
-		return
+	ref, err := name.ParseReference(v)
+	if err != nil {
+		return false, err
 	}
-	// image has a digest, validate further
-	digest = vv[1]
-
-	if !strings.HasPrefix(digest, "sha256:") {
-		err = fmt.Errorf("image digest '%s' requires 'sha256:' prefix", digest)
-		return
-	}
-
-	if len(digest[7:]) != 64 {
-		err = fmt.Errorf("image digest '%v' has an invalid sha256 hash length of %v when it should be 64", digest, len(digest[7:]))
-	}
-
-	validDigest = true
-	return
+	_, ok := ref.(name.Digest)
+	return ok, nil
 }

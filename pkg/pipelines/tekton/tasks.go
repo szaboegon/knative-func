@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-var DeployerImage = "ghcr.io/knative/func-utils:latest"
+var DeployerImage = "ghcr.io/knative/func-utils:v2"
 
 func getBuildpackTask() string {
 	return `apiVersion: tekton.dev/v1
@@ -269,6 +269,7 @@ spec:
       description: Reference of the image S2I will produce.
     - name: REGISTRY
       description: The registry associated with the function image.
+      default: ""
     - name: PATH_CONTEXT
       description: The location of the path to run s2i from.
       default: .
@@ -305,37 +306,21 @@ spec:
     - name: generate
       image: %s
       workingDir: $(workspaces.source.path)
-      args: ["$(params.ENV_VARS[*])"]
-      script: |
-        echo "Processing Build Environment Variables"
-        echo "" > /env-vars/env-file
-        for var in "$@"
-        do
-            if [[ "$var" != "=" ]]; then
-                echo "$var" >> /env-vars/env-file
-            fi
-        done
-
-        echo "Generated Build Env Var file"
-        echo "------------------------------"
-        cat /env-vars/env-file
-        echo "------------------------------"
-
-        /usr/local/bin/s2i --loglevel=$(params.LOGLEVEL) build --keep-symlinks $(params.PATH_CONTEXT) $(params.BUILDER_IMAGE) \
-        --image-scripts-url $(params.S2I_IMAGE_SCRIPTS_URL) \
-        --as-dockerfile /gen-source/Dockerfile.gen --environment-file /env-vars/env-file
-
-        echo "Preparing func.yaml for later deployment"
-        func_file="$(workspaces.source.path)/func.yaml"
-        if [ "$(params.PATH_CONTEXT)" != "" ]; then
-          func_file="$(workspaces.source.path)/$(params.PATH_CONTEXT)/func.yaml"
-        fi
-        sed -i "s|^registry:.*$|registry: $(params.REGISTRY)|" "$func_file"
-        echo "Function image registry: $(params.REGISTRY)"
-
-        s2iignore_file="$(dirname "$func_file")/.s2iignore"
-        [ -f "$s2iignore_file" ] || echo "node_modules" >> "$s2iignore_file"
-
+      command:
+        - s2i-generate
+        - "--target"
+        - /gen-source
+        - "--path-context"
+        - $(params.PATH_CONTEXT)
+        - "--builder-image"
+        - $(params.BUILDER_IMAGE)
+        - "--registry"
+        - $(params.REGISTRY)
+        - "--image-script-url"
+        - $(params.S2I_IMAGE_SCRIPTS_URL)
+        - "--log-level"
+        - $(params.LOGLEVEL)
+        - $(params.ENV_VARS[*])
       volumeMounts:
         - mountPath: /gen-source
           name: gen-source
@@ -350,17 +335,26 @@ spec:
           TLS_VERIFY_FLAG="--tls-verify=false"
         fi
 
+        # Set certificate directory flag if workspace is bound
         [[ "$(workspaces.sslcertdir.bound)" == "true" ]] && CERT_DIR_FLAG="--cert-dir $(workspaces.sslcertdir.path)"
+
+        # Set docker config before any buildah commands
+        [[ "$(workspaces.dockerconfig.bound)" == "true" ]] && export DOCKER_CONFIG="$(workspaces.dockerconfig.path)"
+
+        # Setup artifacts cache path
         ARTIFACTS_CACHE_PATH="$(workspaces.cache.path)/mvn-artifacts"
         [ -d "${ARTIFACTS_CACHE_PATH}" ] || mkdir "${ARTIFACTS_CACHE_PATH}"
+
+        # Build the image
         buildah ${CERT_DIR_FLAG} bud --storage-driver=vfs ${TLS_VERIFY_FLAG} --layers \
           -v "${ARTIFACTS_CACHE_PATH}:/tmp/artifacts/:rw,z,U" \
           -f /gen-source/Dockerfile.gen -t $(params.IMAGE) .
 
-        [[ "$(workspaces.dockerconfig.bound)" == "true" ]] && export DOCKER_CONFIG="$(workspaces.dockerconfig.path)"
+        # Push the image
         buildah ${CERT_DIR_FLAG} push --storage-driver=vfs ${TLS_VERIFY_FLAG} --digestfile $(workspaces.source.path)/image-digest \
           $(params.IMAGE) docker://$(params.IMAGE)
 
+        # Output the image digest
         cat $(workspaces.source.path)/image-digest | tee /tekton/results/IMAGE_DIGEST
       volumeMounts:
       - name: varlibcontainers
@@ -408,8 +402,7 @@ spec:
   steps:
     - name: func-deploy
       image: "%s"
-      script: |
-        deploy $(params.path) "$(params.image)"
+      command: ["deploy", "$(params.path)", "$(params.image)"]
 `, DeployerImage)
 }
 
@@ -430,11 +423,13 @@ spec:
     - name: path
       description: Path to the function project
       default: ""
+  workspaces:
+    - name: source
+      description: The workspace containing the function project
   steps:
     - name: func-scaffold
       image: %s
-      script: |
-        scaffold $(params.path)
+      command: ["scaffold", "$(params.path)"]
 `, DeployerImage)
 }
 

@@ -67,7 +67,7 @@ func TestGitlab(t *testing.T) {
 	ns := usingNamespace(t)
 	t.Logf("testing in namespace: %q", ns)
 
-	funcImg := fmt.Sprintf("ttl.sh/func/fn-%s:5m", uuid.NewUUID())
+	funcImg := fmt.Sprintf("registry.default.svc.cluster.local:5000/fn-%s", uuid.NewUUID())
 
 	f := fn.Function{
 		Root:     projDir,
@@ -594,7 +594,7 @@ func usingNamespace(t *testing.T) string {
 		},
 	}
 	createOpts := metav1.CreateOptions{}
-	ns, err = k8sClient.CoreV1().Namespaces().Create(context.Background(), ns, createOpts)
+	_, err = k8sClient.CoreV1().Namespaces().Create(context.Background(), ns, createOpts)
 	if err != nil {
 		t.Fatal(err)
 	}
