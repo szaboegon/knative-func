@@ -26,7 +26,7 @@
       "request": "launch",
       "mode": "exec",
       "program": "${workspaceRoot}/func.exe",
-      "args": ["deploy", "-p", "./temp/test-gofunc"]
+      "args": ["deploy", "-p", "./temp/test-gofunc", "-v"]
     }
   ]
 }
