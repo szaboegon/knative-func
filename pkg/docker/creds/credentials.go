@@ -236,7 +236,6 @@ func (c *credentialsProvider) getCredentials(ctx context.Context, image string) 
 	}
 
 	registry := ref.Context().RegistryStr()
-
 	for _, load := range c.credentialLoaders {
 
 		result, err = load(registry)
@@ -263,8 +262,14 @@ func (c *credentialsProvider) getCredentials(ctx context.Context, image string) 
 		return docker.Credentials{}, ErrCredentialsNotFound
 	}
 
+	// this is [registry] / [repository]
+	// this is  index.io  / user/imagename
+	repository := registry + "/" + ref.Context().RepositoryStr()
+
+	// the trying-to-actually-authorize cycle
 	for {
-		result, err = c.promptForCredentials(registry)
+		// use repo here to print it out in prompt
+		result, err = c.promptForCredentials(repository)
 		if err != nil {
 			return docker.Credentials{}, err
 		}
@@ -352,6 +357,11 @@ func setCredentialHelperToConfig(confFilePath, helper string) error {
 	configData["credsStore"] = helper
 
 	data, err := json.MarshalIndent(&configData, "", "    ")
+	if err != nil {
+		return err
+	}
+	// create config path if doesnt exist
+	err = os.MkdirAll(filepath.Dir(confFilePath), 0755)
 	if err != nil {
 		return err
 	}

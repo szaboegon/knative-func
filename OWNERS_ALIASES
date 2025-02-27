@@ -9,16 +9,13 @@ aliases:
   - rhuss
   client-writers:
   - dsimansk
-  - maximilien
   - rhuss
   - vyasgun
   docs-reviewers:
   - nainaz
-  - retocode
   - skonto
   docs-writers:
   - csantanapr
-  - retocode
   - skonto
   eventing-reviewers:
   - Leo6Leo
@@ -52,7 +49,6 @@ aliases:
   knative-admin:
   - aliok
   - cardil
-  - davidhadas
   - dprotaso
   - dsimansk
   - evankanderson
@@ -61,11 +57,14 @@ aliases:
   - knative-prow-robot
   - knative-prow-updater-robot
   - knative-test-reporter-robot
-  - nainaz
-  - psschwei
-  - salaboy
+  - matzew
+  - nrrso
+  - skonto
   - upodroid
-  knative-release-leads: []
+  knative-release-leads:
+  - dprotaso
+  - dsimansk
+  - skonto
   knative-robots:
   - knative-automation
   - knative-prow-releaser-robot
@@ -76,14 +75,12 @@ aliases:
   - aliok
   - houshengbo
   - matzew
-  - maximilien
   operations-wg-leads:
   - houshengbo
   operations-writers:
   - aliok
   - houshengbo
   - matzew
-  - maximilien
   productivity-leads:
   - cardil
   - upodroid
@@ -103,32 +100,24 @@ aliases:
   - davidhadas
   - evankanderson
   serving-approvers:
-  - ReToCode
+  - dsimansk
   - skonto
   serving-reviewers:
-  - izabelacg
-  - retocode
   - skonto
   serving-triage:
-  - izabelacg
-  - retocode
   - skonto
   serving-wg-leads:
   - dprotaso
   serving-writers:
-  - ReToCode
   - dprotaso
+  - dsimansk
   - skonto
   steering-committee:
   - aliok
-  - evankanderson
-  - nainaz
-  - salaboy
-  technical-oversight-committee:
-  - davidhadas
   - dprotaso
-  - dsimansk
-  - psschwei
+  - evankanderson
+  - matzew
+  - nrrso
   ux-wg-leads:
   - cali0707
   - leo6leo

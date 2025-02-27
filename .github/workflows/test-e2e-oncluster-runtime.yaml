@@ -17,7 +17,7 @@ jobs:
           echo "KUBECONFIG=${{ github.workspace }}/hack/bin/kubeconfig.yaml" >> "$GITHUB_ENV"
           echo "PATH=${{ github.workspace }}/hack/bin:$PATH" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       - uses: imjasonh/setup-ko@v0.6
       - name: Install Binaries
         run: ./hack/install-binaries.sh
@@ -47,7 +47,7 @@ jobs:
           echo "::group::cluster containers logs"
           stern '.*' --all-namespaces --no-follow
           echo "::endgroup::"
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           files: ./coverage.txt
           flags: e2e-test-oncluster-runtime

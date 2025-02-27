@@ -336,7 +336,7 @@ func sourcesAsTarStream(f fn.Function) *io.PipeReader {
 				}
 			}
 
-			hdr, err := tar.FileInfoHeader(fi, lnk)
+			hdr, err := tar.FileInfoHeader(fi, filepath.ToSlash(lnk))
 			if err != nil {
 				return fmt.Errorf("cannot create a tar header: %w", err)
 			}
@@ -568,7 +568,7 @@ func createPipelinePersistentVolumeClaim(ctx context.Context, f fn.Function, nam
 			return fmt.Errorf("PVC size value could not be parsed. %w", err)
 		}
 	}
-	err = createPersistentVolumeClaim(ctx, getPipelinePvcName(f), namespace, labels, f.Deploy.Annotations, corev1.ReadWriteOnce, pvcs)
+	err = createPersistentVolumeClaim(ctx, getPipelinePvcName(f), namespace, labels, f.Deploy.Annotations, corev1.ReadWriteOnce, pvcs, f.Build.RemoteStorageClass)
 	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		return fmt.Errorf("problem creating persistent volume claim: %v", err)
 	}

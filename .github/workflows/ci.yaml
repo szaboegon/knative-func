@@ -9,7 +9,7 @@ jobs:
     runs-on: "ubuntu-latest"
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       - name: Lint
         run: make check && make check-templates
       - name: Check that 'func.yaml schema' is up-to-date
@@ -26,7 +26,7 @@ jobs:
     steps:
       - run: git config --global core.autocrlf false
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       - uses: actions/setup-java@v4
         with:
           java-version: ${{ matrix.java }}
@@ -38,7 +38,7 @@ jobs:
         run:  make test
       - name: Template Unit Tests
         run:  make test-templates
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           files: ./coverage.txt
           flags: unit-tests-${{ matrix.os }}
@@ -54,7 +54,7 @@ jobs:
           echo "KUBECONFIG=${{ github.workspace }}/hack/bin/kubeconfig.yaml" >> "$GITHUB_ENV"
           echo "PATH=${{ github.workspace }}/hack/bin:$PATH" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       - name: Install Binaries
         run: ./hack/install-binaries.sh
       - name: Allocate Cluster
@@ -65,7 +65,7 @@ jobs:
         run: ./hack/setup-testing-images.sh
       - name: Integration Tests
         run: make test-integration
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           files: ./coverage.txt
           flags: integration-tests
@@ -84,7 +84,7 @@ jobs:
           echo "KUBECONFIG=${{ github.workspace }}/hack/bin/kubeconfig.yaml" >> "$GITHUB_ENV"
           echo "PATH=${{ github.workspace }}/hack/bin:$PATH" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       - name: Install Binaries
         run: ./hack/install-binaries.sh
       - name: Allocate Cluster
@@ -93,7 +93,7 @@ jobs:
         run: ./hack/registry.sh
       - name: E2E Test
         run: make test-e2e
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           files: ./coverage.txt
           flags: e2e-test
@@ -112,7 +112,7 @@ jobs:
           echo "KUBECONFIG=${{ github.workspace }}/hack/bin/kubeconfig.yaml" >> "$GITHUB_ENV"
           echo "PATH=${{ github.workspace }}/hack/bin:$PATH" >> "$GITHUB_ENV"
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       - uses: imjasonh/setup-ko@v0.6
       - name: Install Binaries
         run: ./hack/install-binaries.sh
@@ -128,7 +128,7 @@ jobs:
         env:
           E2E_RUNTIMES: ""
         run: make test-e2e-on-cluster
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v5
         with:
           files: ./coverage.txt
           flags: e2e-test-oncluster
@@ -141,7 +141,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       # Standard build tasks
       - name: Build
         run: make cross-platform
@@ -180,6 +180,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: knative/actions/setup-go@main
+      - uses: docker/setup-qemu-action@v3
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -188,11 +190,14 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push
         run: |
+          for a in amd64 arm64 ppc64le s390x; do
+            CGO_ENABLED=0 go build -o "func-util-$a" -trimpath -ldflags '-w -s' ./cmd/func-util
+          done
           docker buildx create --name multiarch --driver docker-container --use
           docker buildx build . -f Dockerfile.utils \
             --platform=linux/ppc64le,linux/s390x,linux/amd64,linux/arm64 \
             --push \
-            -t "ghcr.io/knative/func-utils:latest" \
+            -t "ghcr.io/knative/func-utils:v2" \
             --annotation index:org.opencontainers.image.description="Knative Func Utils Image" \
             --annotation index:org.opencontainers.image.source="https://github.com/knative/func" \
             --annotation index:org.opencontainers.image.vendor="https://github.com/knative/func" \
@@ -203,6 +208,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/composite/go-setup
+      - uses: knative/actions/setup-go@main
       - uses: imjasonh/setup-ko@v0.6
       - run: ko build --platform=linux/ppc64le,linux/s390x,linux/amd64,linux/arm64 -B ./cmd/func

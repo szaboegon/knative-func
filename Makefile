@@ -29,12 +29,14 @@ VERS         ?= $(shell git describe --tags --match 'v*')
 KVER         ?= $(shell git describe --tags --match 'knative-*')
 
 LDFLAGS      := -X knative.dev/func/pkg/app.vers=$(VERS) -X knative.dev/func/pkg/app.kver=$(KVER) -X knative.dev/func/pkg/app.hash=$(HASH)
-ifneq ($(FUNC_REPO_REF),)
-  LDFLAGS      += -X knative.dev/func/pkg/pipelines/tekton.FuncRepoRef=$(FUNC_REPO_REF)
-endif
-ifneq ($(FUNC_REPO_BRANCH_REF),)
-  LDFLAGS      += -X knative.dev/func/pkg/pipelines/tekton.FuncRepoBranchRef=$(FUNC_REPO_BRANCH_REF)
-endif
+
+FUNC_UTILS_IMG ?= ghcr.io/knative/func-utils:v2
+LDFLAGS += -X knative.dev/func/pkg/k8s.SocatImage=$(FUNC_UTILS_IMG)
+LDFLAGS += -X knative.dev/func/pkg/k8s.TarImage=$(FUNC_UTILS_IMG)
+LDFLAGS += -X knative.dev/func/pkg/pipelines/tekton.DeployerImage=$(FUNC_UTILS_IMG)
+
+GOFLAGS      := "-ldflags=$(LDFLAGS)"
+export GOFLAGS
 
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
@@ -62,11 +64,11 @@ build: $(BIN) ## (default) Build binary for current OS
 
 .PHONY: $(BIN)
 $(BIN): generate/zz_filesystem_generated.go
-	env CGO_ENABLED=0 go build -ldflags "$(LDFLAGS)" ./cmd/$(BIN)
+	env CGO_ENABLED=0 go build ./cmd/$(BIN)
 
 .PHONY: test
 test: generate/zz_filesystem_generated.go ## Run core unit tests
-	go test -ldflags "$(LDFLAGS)" -race -cover -coverprofile=coverage.txt ./...
+	go test -race -cover -coverprofile=coverage.txt ./...
 
 .PHONY: check
 check: $(BIN_GOLANGCI_LINT) ## Check code quality (lint)
@@ -74,10 +76,10 @@ check: $(BIN_GOLANGCI_LINT) ## Check code quality (lint)
 	cd test && $(BIN_GOLANGCI_LINT) run --timeout 300s
 
 $(BIN_GOLANGCI_LINT):
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.59.1
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ./bin v1.62.2
 
 .PHONY: generate/zz_filesystem_generated.go
-generate/zz_filesystem_generated.go: clean_templates templates/certs/ca-certificates.crt
+generate/zz_filesystem_generated.go: clean_templates
 	go generate pkg/functions/templates_embedded.go
 
 .PHONY: clean_templates
@@ -195,12 +197,12 @@ templates/certs/ca-certificates.crt:
 ###################
 
 test-integration: ## Run integration tests using an available cluster.
-	go test -ldflags "$(LDFLAGS)" -tags integration -timeout 30m --coverprofile=coverage.txt ./... -v
+	go test -tags integration -timeout 30m --coverprofile=coverage.txt ./... -v
 
 .PHONY: func-instrumented
 
 func-instrumented: ## Func binary that is instrumented for e2e tests
-	env CGO_ENABLED=1 go build -ldflags "$(LDFLAGS)" -cover -o func ./cmd/$(BIN)
+	env CGO_ENABLED=1 go build -cover -o func ./cmd/$(BIN)
 
 test-e2e: func-instrumented ## Run end-to-end tests using an available cluster.
 	./test/e2e_extended_tests.sh
@@ -267,3 +269,27 @@ schema-check: ## Check that func.yaml schema is up-to-date
 	(echo "\n\nFunction config schema 'schema/func_yaml-schema.json' is obsolete, please run 'make schema-generate'.\n\n"; rm -rf schema/func_yaml-schema-previous.json; exit 1)
 	rm -rf schema/func_yaml-schema-previous.json
 
+######################
+##@ Hack scripting
+######################
+
+### Local section - Can be run locally!
+
+.PHONY: generate-kn-components-local
+generate-kn-components-local: ## Generate knative components locally
+	cd hack && go run ./cmd/update-knative-components "local"
+
+.PHONY: test-hack
+test-hack:
+	cd hack && go test ./... -v
+
+### Automated section - This gets run in workflows, scripts etc.
+.PHONY: wf-generate-kn-components
+wf-generate-kn-components: # Generate kn components - used in automation
+	cd hack && go run ./cmd/update-knative-components
+
+.PHONY: update-builder
+wf-update-builder: # Used in automation
+	cd hack && go run ./cmd/update-builder
+
+### end of automation section
